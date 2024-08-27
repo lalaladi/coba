@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload File to Google Drive</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+</head>
+<body>
+    <div class="container">
+        <h1>Upload File to Google Drive</h1>
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" class="form-control" id="name" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" class="form-control" id="email" required>
+            </div>
+            <div class="form-group">
+                <label for="file">Choose File</label>
+                <input type="file" class="form-control" id="file" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Upload</button>
+        </form>
+        <div id="status"></div>
+    </div>
+
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script>
+        let accessToken;
+
+        function authenticate() {
+            return gapi.auth2.getAuthInstance()
+                .signIn({scope: 'https://www.googleapis.com/auth/drive.file'})
+                .then(() => {
+                    console.log("Sign-in successful");
+                },
+                err => console.error("Error signing in", err));
+        }
+
+        function loadClient() {
+            gapi.client.setApiKey("AIzaSyDWzIMdLAUid2GpHgZo4Uv93WH0n_THipI");
+            return gapi.client.load("https://content.googleapis.com/discovery/v1/apis/drive/v3/rest")
+                .then(() => {
+                    console.log("GAPI client loaded for API");
+                },
+                err => console.error("Error loading GAPI client for API", err));
+        }
+
+        function uploadFile(file, name, email) {
+            const metadata = {
+                name: file.name,
+                mimeType: file.type,
+            };
+
+            const form = new FormData();
+            form.append("metadata", new Blob([JSON.stringify(metadata)], {type: "application/json"}));
+            form.append("file", file);
+
+            // Update status to show that upload is in progress
+            document.getElementById("status").innerText = "Uploading file, please wait...";
+
+            fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+                method: "POST",
+                headers: new Headers({Authorization: "Bearer " + accessToken}),
+                body: form,
+            })
+            .then(res => res.json())
+            .then(file => {
+                console.log("File Upload Response:", file); // Tambahkan log ini
+                if (file && file.id) {
+                    document.getElementById("status").innerText = `File uploaded successfully! File ID: ${file.id}`;
+                } else {
+                    document.getElementById("status").innerText = "File uploaded, but ID is undefined.";
+                }
+            })
+            .catch(err => {
+                console.error("Error uploading file", err);
+                // Update status with error message
+                document.getElementById("status").innerText = "Error uploading file";
+            });
+        }
+
+        document.getElementById("uploadForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            console.log("Form submit triggered");
+
+            const file = document.getElementById("file").files[0];
+            const name = document.getElementById("name").value;
+            const email = document.getElementById("email").value;
+
+            if (!file) {
+                console.error("No file selected");
+                return;
+            }
+
+            // Display a message indicating the start of the upload process
+            document.getElementById("status").innerText = "Starting authentication...";
+
+            authenticate().then(() => {
+                console.log("Authenticated");
+                accessToken = gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse().access_token;
+                console.log("Access token:", accessToken);
+                
+                // Update status message to indicate upload is starting
+                document.getElementById("status").innerText = "Authentication successful! Starting file upload...";
+
+                uploadFile(file, name, email);
+            }).catch(err => {
+                console.error("Authentication failed", err);
+                document.getElementById("status").innerText = "Authentication failed";
+            });
+        });
+
+        gapi.load("client:auth2", function() {
+            gapi.auth2.init({client_id: "139775365540-e0aiqnj601bogpb6844knhi52kqp4khg.apps.googleusercontent.com"});
+            console.log("GAPI client initialized");
+        });
+    </script>
+
+    <script src="main.js"></script>
+</body>
+</html>
